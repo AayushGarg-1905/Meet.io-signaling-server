@@ -44,6 +44,14 @@ io.on('connection', socket => {
     }
   });
 
+  socket.on('update-video-toggle-on-peer',({roomId,isVideoEnabled})=>{
+    socket.to(roomId).emit('update-video-toggle-on-peer',{isVideoEnabled});
+  })
+
+  socket.on('update-audio-toggle-on-peer',({roomId,isAudioEnabled})=>{
+    socket.to(roomId).emit('update-audio-toggle-on-peer',{isAudioEnabled});
+  })
+
   socket.on('leave-room',({roomId})=>{
     console.log('leave room ...');
     socket.to(roomId).emit('peer-leave-room');
@@ -52,7 +60,6 @@ io.on('connection', socket => {
   socket.on('disconnect', () => {
     const { roomId } = socket;
     console.log('Socket disconnected:', socket.id);
-    // Optional: clear room data if both users leave
   });
 });
 
