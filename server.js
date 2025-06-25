@@ -19,7 +19,7 @@ io.on('connection', socket => {
     console.log('socket has joined the room')
     // Send existing offer if present
     const room = rooms[roomId];
-    console.log(rooms[roomId]);
+    // console.log(rooms[roomId]);
     if (room?.offer) {
       socket.emit('offer-available', room.offer);
     }
@@ -43,6 +43,11 @@ io.on('connection', socket => {
       socket.to(roomId).emit('receive-ice-candidate', { role, candidate });
     }
   });
+
+  socket.on('leave-room',({roomId})=>{
+    console.log('leave room ...');
+    socket.to(roomId).emit('peer-leave-room');
+  })
 
   socket.on('disconnect', () => {
     const { roomId } = socket;
