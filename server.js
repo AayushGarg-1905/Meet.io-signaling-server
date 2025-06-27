@@ -8,7 +8,8 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-const rooms = {}; // { roomId: { offer: {}, answer: {}, candidates: { offerer: [], answerer: [] } } }
+// { roomId: { offer: {}, answer: {}, candidates: { offerer: [], answerer: [] }, chats:[{senderId,receiverId,msg}] } }
+const rooms = {}; 
 
 io.on('connection', socket => {
   console.log('Socket connected:', socket.id);
@@ -17,7 +18,7 @@ io.on('connection', socket => {
     socket.join(roomId);
     socket.roomId = roomId;
     console.log('socket has joined the room')
-    // Send existing offer if present
+
     const room = rooms[roomId];
     // console.log(rooms[roomId]);
     if (room?.offer) {
@@ -29,6 +30,7 @@ io.on('connection', socket => {
     console.log('send offer initiated');
     rooms[roomId] = rooms[roomId] || { candidates: { offerer: [], answerer: [] } };
     rooms[roomId].offer = offer;
+    rooms[roomId].chats = []
     socket.to(roomId).emit('receive-offer', offer);
   });
 
@@ -52,6 +54,22 @@ io.on('connection', socket => {
     socket.to(roomId).emit('update-audio-toggle-on-peer',{isAudioEnabled});
   })
 
+  socket.on('send-chat-msg', ({ roomId, msg }) => {
+    if (rooms[roomId]) {
+      const chatMsg = { senderId: socket.id, receiverId: '', msg };
+      rooms[roomId].chats.push(chatMsg);
+      io.to(roomId).emit('update-chat-box-with-new-msg', chatMsg);
+    }
+  });
+
+  socket.on('get-chat-box-history', ({ roomId }, callback) => {
+    if (rooms[roomId]) {
+      callback(rooms[roomId].chats);
+    } else {
+      callback([]);
+    }
+  });
+
   socket.on('leave-room',({roomId})=>{
     console.log('leave room ...');
     socket.to(roomId).emit('peer-leave-room');
@@ -59,6 +77,9 @@ io.on('connection', socket => {
 
   socket.on('disconnect', () => {
     const { roomId } = socket;
+    if(rooms[roomId]){
+      rooms[roomId].chats=[]
+    }
     console.log('Socket disconnected:', socket.id);
   });
 });
