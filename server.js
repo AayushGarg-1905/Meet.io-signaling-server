@@ -54,9 +54,9 @@ io.on('connection', socket => {
     socket.to(roomId).emit('update-audio-toggle-on-peer',{isAudioEnabled});
   })
 
-  socket.on('send-chat-msg', ({ roomId, msg }) => {
+  socket.on('send-chat-msg', ({ roomId, msg, timestamp }) => {
     if (rooms[roomId]) {
-      const chatMsg = { senderId: socket.id, receiverId: '', msg };
+      const chatMsg = { senderId: socket.id, receiverId: '', msg, timestamp };
       rooms[roomId].chats.push(chatMsg);
       io.to(roomId).emit('update-chat-box-with-new-msg', chatMsg);
     }
