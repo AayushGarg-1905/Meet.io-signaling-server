@@ -9,26 +9,37 @@ const io = new Server(server, {
 });
 
 // { roomId: { offer: {}, answer: {}, candidates: { offerer: [], answerer: [] }, chats:[{senderId,receiverId,msg}] } }
-const rooms = {}; 
+const rooms = {};
 
 io.on('connection', socket => {
   console.log('Socket connected:', socket.id);
 
   socket.on('join-room', (roomId) => {
+    const room = rooms[roomId];
+
+    if (room && room.users.size >= 2) {
+      socket.emit('room-full'); 
+      return;
+    }
+
     socket.join(roomId);
     socket.roomId = roomId;
-    console.log('socket has joined the room')
+    console.log('Socket has joined the room:', roomId, 'socket id is ',socket.id);
 
-    const room = rooms[roomId];
-    // console.log(rooms[roomId]);
-    if (room?.offer) {
-      socket.emit('offer-available', room.offer);
+    if (!room) {
+      rooms[roomId] = { users: new Set() };
+    } else {
+      rooms[roomId].users.add(socket.id);
+    }
+
+    if (rooms[roomId].offer) {
+      socket.emit('offer-available', rooms[roomId].offer);
     }
   });
 
   socket.on('send-offer', ({ roomId, offer }) => {
     console.log('send offer initiated');
-    rooms[roomId] = rooms[roomId] || { candidates: { offerer: [], answerer: [] } };
+    rooms[roomId] = {...rooms[roomId], candidates: { offerer: [], answerer: [] } };
     rooms[roomId].offer = offer;
     rooms[roomId].chats = []
     socket.to(roomId).emit('receive-offer', offer);
@@ -40,22 +51,22 @@ io.on('connection', socket => {
   });
 
   socket.on('send-ice-candidate', ({ roomId, role, candidate }) => {
-    if (rooms[roomId]) {
+    if (rooms[roomId] && rooms[roomId].candidates) {
       rooms[roomId].candidates[role].push(candidate);
       socket.to(roomId).emit('receive-ice-candidate', { role, candidate });
     }
   });
 
-  socket.on('update-video-toggle-on-peer',({roomId,isVideoEnabled})=>{
-    socket.to(roomId).emit('update-video-toggle-on-peer',{isVideoEnabled});
+  socket.on('update-video-toggle-on-peer', ({ roomId, isVideoEnabled }) => {
+    socket.to(roomId).emit('update-video-toggle-on-peer', { isVideoEnabled });
   })
 
-  socket.on('update-audio-toggle-on-peer',({roomId,isAudioEnabled})=>{
-    socket.to(roomId).emit('update-audio-toggle-on-peer',{isAudioEnabled});
+  socket.on('update-audio-toggle-on-peer', ({ roomId, isAudioEnabled }) => {
+    socket.to(roomId).emit('update-audio-toggle-on-peer', { isAudioEnabled });
   })
 
   socket.on('send-chat-msg', ({ roomId, msg, timestamp }) => {
-    if (rooms[roomId]) {
+    if (rooms[roomId] && rooms[roomId].chats) {
       const chatMsg = { senderId: socket.id, receiverId: '', msg, timestamp };
       rooms[roomId].chats.push(chatMsg);
       io.to(roomId).emit('update-chat-box-with-new-msg', chatMsg);
@@ -70,15 +81,24 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('leave-room',({roomId})=>{
+  socket.on('leave-room', ({ roomId }) => {
     console.log('leave room ...');
+    if (rooms[roomId]) {
+      rooms[roomId].chats = []
+    }
+    if(rooms[roomId] && rooms[roomId].users && rooms[roomId].users.has(socket.id)){
+      rooms[roomId].users.delete(socket.id);
+    }
     socket.to(roomId).emit('peer-leave-room');
   })
 
   socket.on('disconnect', () => {
     const { roomId } = socket;
-    if(rooms[roomId]){
-      rooms[roomId].chats=[]
+    if (rooms[roomId]) {
+      rooms[roomId].chats = []
+    }
+    if(rooms[roomId] && rooms[roomId].users && rooms[roomId].users.has(socket.id)){
+      rooms[roomId].users.delete(socket.id);
     }
     console.log('Socket disconnected:', socket.id);
   });
